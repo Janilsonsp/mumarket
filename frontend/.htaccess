@@ -1,0 +1,15 @@
+RewriteEngine On
+RewriteBase /
+
+# Handle API requests - pass to backend
+RewriteRule ^api/(.*)$ - [L]
+
+# Handle socket.io
+RewriteRule ^socket\.io/(.*)$ - [L]
+
+# Handle static files
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# SPA fallback - serve index.html for all other routes
+RewriteRule . /index.html [L]

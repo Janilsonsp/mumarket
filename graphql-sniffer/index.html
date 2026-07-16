@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MuDream GraphQL Sniffer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 20px; }
+    h1 { color: #00d4ff; margin-bottom: 10px; }
+    p { color: #888; margin-bottom: 20px; }
+    .instructions { background: #1a1a2e; border: 1px solid #333; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
+    .instructions h3 { color: #ffd700; margin-bottom: 10px; }
+    .instructions ol { padding-left: 20px; }
+    .instructions li { margin-bottom: 8px; }
+    code { background: #2a2a3e; padding: 2px 6px; border-radius: 4px; color: #00ff88; }
+    textarea { width: 100%; height: 200px; background: #1a1a2e; border: 1px solid #333; border-radius: 8px; color: #00ff88; font-family: 'Fira Code', monospace; font-size: 12px; padding: 10px; resize: vertical; }
+    button { background: #00d4ff; color: #000; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; margin-right: 10px; margin-top: 10px; }
+    button:hover { background: #00b8d4; }
+    button.secondary { background: #333; color: #fff; }
+    button.secondary:hover { background: #444; }
+    #output { background: #1a1a2e; border: 1px solid #333; border-radius: 8px; padding: 15px; margin-top: 20px; max-height: 400px; overflow-y: auto; }
+    .query-entry { border-bottom: 1px solid #333; padding: 10px 0; }
+    .query-entry:last-child { border-bottom: none; }
+    .query-name { color: #00d4ff; font-weight: 600; }
+    .query-type { color: #ffd700; font-size: 12px; margin-left: 8px; }
+    .query-variables { color: #888; font-size: 11px; margin-top: 5px; }
+    .status { padding: 10px; border-radius: 6px; margin-bottom: 15px; }
+    .status.active { background: #003300; border: 1px solid #00ff00; color: #00ff00; }
+    .status.inactive { background: #330000; border: 1px solid #ff0000; color: #ff0000; }
+  </style>
+</head>
+<body>
+  <h1>MuDream GraphQL Sniffer</h1>
+  <p>Ferramenta para capturar queries GraphQL utilizadas pelo Market</p>
+
+  <div class="instructions">
+    <h3>Como usar:</h3>
+    <ol>
+      <li>Abra o <a href="https://mudream.online/pt/market" target="_blank" style="color:#00d4ff">Market do MuDream</a> no navegador</li>
+      <li>Abra o Console do Navegador (F12 → Console)</li>
+      <li>Cole o script abaixo no console e pressione Enter</li>
+      <li>Navegue pelo Market (clique em filtros, paginação, etc.)</li>
+      <li>As queries capturadas aparecerão aqui automaticamente</li>
+      <li>Clique em "Exportar Configuração" para gerar o arquivo de configuração</li>
+    </ol>
+  </div>
+
+  <h3>Script para colar no console:</h3>
+  <textarea id="snifferScript" readonly></textarea>
+  <button onclick="copyScript()">Copiar Script</button>
+  <button onclick="clearOutput()" class="secondary">Limpar Resultados</button>
+  <button onclick="exportConfig()" class="secondary">Exportar Configuração</button>
+
+  <div id="status" class="status inactive">Status: Aguardando capturas...</div>
+  <div id="output">
+    <p style="color: #666">Nenhuma query capturada ainda</p>
+  </div>
+
+  <script>
+    const capturedQueries = [];
+    const snifferScript = `
+// MuDream GraphQL Sniffer - Cole este script no console do navegador
+(function() {
+  const originalFetch = window.fetch;
+  window.fetch = async function(...args) {
+    const [url, options] = args;
+    if (url.includes('/api/graphql') && options?.method === 'POST') {
+      try {
+        const body = JSON.parse(options.body);
+        const capture = {
+          timestamp: new Date().toISOString(),
+          operationName: body.operationName,
+          query: body.query,
+          variables: body.variables,
+          type: body.query.includes('mutation') ? 'mutation' : 'query'
+        };
+        
+        window.postMessage({
+          type: 'GRAPHQL_CAPTURE',
+          data: capture
+        }, '*');
+        
+        console.log('%c[Sniffer] Captured:', 'color: #00ff88', body.operationName || 'Anonymous');
+      } catch (e) {}
+    }
+    return originalFetch.apply(this, args);
+  };
+
+  const originalXHR = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+    if (url.includes('/api/graphql')) {
+      this._snifferUrl = url;
+      this._snifferMethod = method;
+    }
+    return originalXHR.apply(this, [method, url, ...rest]);
+  };
+
+  const originalSend = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.send = function(body) {
+    if (this._snifferUrl && body) {
+      try {
+        const data = JSON.parse(body);
+        const capture = {
+          timestamp: new Date().toISOString(),
+          operationName: data.operationName,
+          query: data.query,
+          variables: data.variables,
+          type: data.query?.includes('mutation') ? 'mutation' : 'query'
+        };
+        
+        window.postMessage({
+          type: 'GRAPHQL_CAPTURE',
+          data: capture
+        }, '*');
+        
+        console.log('%c[Sniffer] Captured (XHR):', 'color: #00ff88', data.operationName || 'Anonymous');
+      } catch (e) {}
+    }
+    return originalSend.apply(this, [body]);
+  };
+
+  console.log('%c[MuDream Sniffer] Active!', 'color: #00ff88; font-size: 16px; font-weight: bold');
+  console.log('%cNavigate the market to capture GraphQL queries', 'color: #888');
+})();
+`;
+
+    document.getElementById('snifferScript').value = snifferScript;
+
+    function copyScript() {
+      navigator.clipboard.writeText(snifferScript);
+      alert('Script copiado! Cole no console do navegador.');
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.data?.type === 'GRAPHQL_CAPTURE') {
+        addCapture(event.data.data);
+      }
+    });
+
+    function addCapture(capture) {
+      capturedQueries.push(capture);
+      updateOutput();
+      updateStatus();
+    }
+
+    function updateOutput() {
+      const output = document.getElementById('output');
+      if (capturedQueries.length === 0) {
+        output.innerHTML = '<p style="color: #666">Nenhuma query capturada ainda</p>';
+        return;
+      }
+
+      output.innerHTML = capturedQueries.map((q, i) => `
+        <div class="query-entry">
+          <span class="query-name">${q.operationName || 'Anonymous'}</span>
+          <span class="query-type">${q.type}</span>
+          <div class="query-variables">Variables: ${JSON.stringify(q.variables, null, 2)}</div>
+          <details>
+            <summary style="color: #666; cursor: pointer; margin-top: 5px">Ver query completa</summary>
+            <pre style="color: #00ff88; font-size: 11px; margin-top: 5px; white-space: pre-wrap">${escapeHtml(q.query || '')}</pre>
+          </details>
+        </div>
+      `).join('');
+    }
+
+    function updateStatus() {
+      const status = document.getElementById('status');
+      if (capturedQueries.length > 0) {
+        status.className = 'status active';
+        status.textContent = `Status: ${capturedQueries.length} query(ies) capturada(s)`;
+      }
+    }
+
+    function clearOutput() {
+      capturedQueries.length = 0;
+      updateOutput();
+      updateStatus();
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function exportConfig() {
+      const queries = capturedQueries.map(q => ({
+        operationName: q.operationName,
+        type: q.type,
+        query: q.query,
+        variables: q.variables
+      }));
+
+      const config = {
+        endpoint: 'https://mudream.online/api/graphql',
+        capturedAt: new Date().toISOString(),
+        queries
+      };
+
+      const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'mudream-graphql-config.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>

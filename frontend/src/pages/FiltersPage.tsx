@@ -62,6 +62,7 @@ function filterToFormData(filter: any): FilterFormData {
     ancient: filter.ancient ?? false,
     excellent: filter.excellent ?? false,
     excellentOptions: filter.excellentOptions || [],
+    optionsMatchType: filter.optionsMatchType || 'and',
     socket: filter.socket ?? false,
     minSockets: filter.minSockets ?? '',
     luck: filter.luck ?? false,

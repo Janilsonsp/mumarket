@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { User, Filter, MarketItem, FilterMatch, MonitoringStatus, LogEntry } from '../../shared/src/types';
+import { User, Filter, MarketItem, FilterMatch, MonitoringStatus } from '../../../shared/src/types';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 

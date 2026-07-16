@@ -11,7 +11,7 @@ export class GraphQLClient {
   private msgId = 0;
   private pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();
   private failedAttempts = 0;
-  private pageWsUrl: string | null = null;
+  private pageWsUrl: string = '';
 
   constructor() {
     this.endpoint = config.mudream.graphqlEndpoint;
@@ -32,7 +32,7 @@ export class GraphQLClient {
 
     if (!mudream) throw new Error('Abra o MuDream Market no Chrome primeiro');
 
-    this.pageWsUrl = mudream.webSocketDebuggerUrl;
+    this.pageWsUrl = mudream.webSocketDebuggerUrl || '';
     return this.pageWsUrl;
   }
 
@@ -67,7 +67,7 @@ export class GraphQLClient {
 
       ws.on('close', () => {
         this.ws = null;
-        this.pageWsUrl = null;
+        this.pageWsUrl = '';
       });
 
       ws.on('error', (err) => {
@@ -137,7 +137,7 @@ export class GraphQLClient {
       if (this.failedAttempts >= 3) {
         this.ws?.close();
         this.ws = null;
-        this.pageWsUrl = null;
+        this.pageWsUrl = '';
       }
 
       console.error(`[GraphQL] ${graphQLQuery.operationName} ERRO em ${duration}ms (#${this.failedAttempts}): ${(error as Error).message?.substring(0, 150)}`);
@@ -148,7 +148,7 @@ export class GraphQLClient {
   async close() {
     this.ws?.close();
     this.ws = null;
-    this.pageWsUrl = null;
+    this.pageWsUrl = '';
   }
 
   async getItemsFromDOM(): Promise<any[]> {

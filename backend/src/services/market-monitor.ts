@@ -282,14 +282,14 @@ export class MarketMonitor extends EventEmitter {
       
       if (matchType === 'or') {
         // OR - any option matches
-        const hasAny = requiredOpts.some(opt => itemOptions.some(io => io.includes(opt)));
+        const hasAny = requiredOpts.some((opt: string) => itemOptions.some((io: string) => io.includes(opt)));
         if (!hasAny) {
           console.log(`[DEBUG] Options OR FAIL: none of [${requiredOpts}] in [${itemOptions}]`);
           return { match: false, reason: `nenhuma option encontrada: ${requiredOpts.join(', ')}` };
         }
       } else {
         // AND - all options required (default)
-        const missing = requiredOpts.filter(opt => !itemOptions.some(io => io.includes(opt)));
+        const missing = requiredOpts.filter((opt: string) => !itemOptions.some((io: string) => io.includes(opt)));
         if (missing.length > 0) {
           console.log(`[DEBUG] Options AND FAIL: missing [${missing}] from [${itemOptions}]`);
           return { match: false, reason: `options faltando: ${missing.join(', ')}` };

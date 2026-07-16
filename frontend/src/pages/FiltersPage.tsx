@@ -10,7 +10,7 @@ import {
   CATEGORIES,
   EXCELLENT_OPTIONS_WEAPONS, EXCELLENT_OPTIONS_ARMOR,
   WEAPON_CATEGORIES, ARMOR_CATEGORIES,
-} from '../../../shared/src/constants';
+} from '../shared/constants';
 
 interface FilterFormData {
   name: string;

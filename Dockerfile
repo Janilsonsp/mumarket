@@ -22,4 +22,4 @@ WORKDIR /app/backend
 EXPOSE 3000
 
 # Start
-CMD ["node", "dist/index.js"]
+CMD ["node", "/app/backend/dist/index.js"]

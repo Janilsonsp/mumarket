@@ -34,7 +34,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    const mapped = (filters || []).map(f => ({
+    const mapped = (filters || []).map((f: any) => ({
       id: f.id,
       userId: f.user_id,
       name: f.name,

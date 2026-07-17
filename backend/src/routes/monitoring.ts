@@ -66,7 +66,7 @@ router.post('/matches/read-all', async (req: AuthRequest, res: Response) => {
       return res.status(204).send();
     }
 
-    const filterIds = userFilters.map(f => f.id);
+    const filterIds = userFilters.map((f: any) => f.id);
 
     const { error } = await supabase
       .from('filter_matches')

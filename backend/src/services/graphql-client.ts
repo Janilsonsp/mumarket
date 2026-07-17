@@ -77,8 +77,8 @@ export class GraphQLClient {
         if (msg.id === msgId) {
           ws.close();
           if (msg.error) reject(new Error(msg.error.message));
-          else if (msg.result?.exceptionDetails) reject(new Error('Evaluation failed'));
-          else resolve(msg.result.value);
+          else if (msg.result?.exceptionDetails) reject(new Error('Evaluation failed: ' + (msg.result.exceptionDetails.exception?.description || '')));
+          else resolve(msg.result?.result?.value);
         }
       });
 

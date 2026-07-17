@@ -2,18 +2,21 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# Copy package files
-COPY backend/package*.json ./
+# Copy root package.json and lockfile
+COPY package.json package-lock.json ./
 
-# Install dependencies
+# Copy all workspace directories
+COPY backend/ ./backend/
+COPY shared/ ./shared/
+
+# Install all dependencies
 RUN npm install
 
-# Copy source code
-COPY backend/ ./
-COPY shared/ ../shared/
+# Build backend
+RUN cd backend && npm run build
 
-# Build
-RUN npm run build
+# Set working directory to backend
+WORKDIR /app/backend
 
 # Expose port
 EXPOSE 3000

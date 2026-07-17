@@ -5,6 +5,6 @@
     "buildCommand": "cd backend && npm install && npm run build"
   },
   "deploy": {
-    "startCommand": "cd backend && node dist/src/index.js"
+    "startCommand": "sh -c \"cd backend && node dist/src/index.js\""
   }
 }

@@ -56,42 +56,39 @@ export class MarketMonitor extends EventEmitter {
     const startTime = Date.now();
 
     try {
-      // Search for each filter's items on the MuDream market
-      const allItems: any[] = [];
-      
-      for (const filter of this.filters) {
-        const searchTerm = filter.itemName || filter.category || '';
-        if (!searchTerm) continue;
+      const query = this.buildMarketQuery();
+      const response = await graphqlClient.query<any>(query);
 
-        console.log(`[Monitor] Buscando: "${searchTerm}"`);
-        const items = await graphqlClient.searchItems(searchTerm);
-        console.log(`[Monitor] Encontrados: ${items.length} itens`);
+      const duration = Date.now() - startTime;
+
+      if (response.data?.lots?.Lots) {
+        const lots = response.data.lots.Lots;
         
-        // Add filter info to items
-        items.forEach((item: any) => {
-          item.filterId = filter.id;
-          item.filterName = filter.name;
-          item.type = this.guessCategory(item.name);
+        // Map MuDream lots to our item format
+        const items = lots.map((lot: any) => {
+          const prices = this.extractPrices(lot);
+          const options = this.extractOptions(lot);
+          return {
+            id: lot.id,
+            name: lot.source || 'Unknown',
+            type: lot.type || '',
+            gearScore: lot.gearScore || 0,
+            options,
+            imageUrl: lot.imageUrl || '',
+            prices: lot.Prices || [],
+          };
         });
-        
-        allItems.push(...items);
+
+        console.log(`[Monitor] ${items.length} itens obtidos em ${duration}ms`);
+
+        // Check matches against user filters
+        this.checkMatches(items);
+        this.emit('market:update', items);
       }
 
-      // Remove duplicates by name
-      const uniqueItems = allItems.filter((item: any, i: number, arr: any[]) => 
-        arr.findIndex((x: any) => x.name === item.name) === i
-      );
-
-      if (uniqueItems.length > 0) {
-        console.log(`[Monitor] Total: ${uniqueItems.length} itens unicos`);
-        uniqueItems.slice(0, 5).forEach((item: any) => {
-          console.log(`[Monitor]   ${item.name} | cat:${item.type} | opts:[${item.options.join(',')}]`);
-        });
+      if (response.errors) {
+        console.error('[Monitor] GraphQL errors:', response.errors);
       }
-
-      this.emit('market:update', uniqueItems);
-      this.checkMatches(uniqueItems);
-
     } catch (error) {
       const duration = Date.now() - startTime;
       const msg = error instanceof Error ? error.message : 'Unknown error';
@@ -214,6 +211,26 @@ export class MarketMonitor extends EventEmitter {
     }
 
     return prices;
+  }
+
+  private extractOptions(lot: any): string[] {
+    const options: string[] = [];
+    
+    // Extract options from lot data
+    if (lot.Currencies) {
+      for (const c of lot.Currencies) {
+        if (c.code) options.push(c.code.toUpperCase());
+      }
+    }
+    
+    // Check for excellent options based on item properties
+    if (lot.excellent) options.push('EXE');
+    if (lot.luck) options.push('LUCK');
+    if (lot.skill) options.push('SKILL');
+    if (lot.socket) options.push('SOC');
+    if (lot.ancient) options.push('ANC');
+    
+    return options;
   }
 
   private guessCategory(name: string): string {

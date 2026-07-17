@@ -1,17 +1,11 @@
 import { config } from '../config';
 import { GraphQLResponse, GraphQLQuery } from '../shared/types';
-import WebSocket from 'ws';
-
-const CDP_PORT = 9222;
+import https from 'https';
 
 export class GraphQLClient {
   private endpoint: string;
   private rawCookie: string;
-  private ws: WebSocket | null = null;
-  private msgId = 0;
-  private pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();
   private failedAttempts = 0;
-  private pageWsUrl: string = '';
 
   constructor() {
     this.endpoint = config.mudream.graphqlEndpoint;
@@ -23,198 +17,76 @@ export class GraphQLClient {
     this.failedAttempts = 0;
   }
 
-  private async getPageWsUrl(): Promise<string> {
-    if (this.pageWsUrl) return this.pageWsUrl;
-
-    const resp = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-    const pages = await resp.json() as any[];
-    const mudream = pages.find((p: any) => p.url?.includes('mudream.online'));
-
-    if (!mudream) throw new Error('Abra o MuDream Market no Chrome primeiro');
-
-    this.pageWsUrl = mudream.webSocketDebuggerUrl || '';
-    return this.pageWsUrl;
-  }
-
-  private async ensureWs(): Promise<WebSocket> {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) return this.ws;
-
-    const wsUrl = await this.getPageWsUrl();
-
-    return new Promise((resolve, reject) => {
-      const ws = new WebSocket(wsUrl);
-
-      ws.on('open', () => {
-        this.ws = ws;
-        console.log('[GraphQL] CDP conectado');
-        resolve(ws);
-      });
-
-      ws.on('message', (data: Buffer) => {
-        try {
-          const msg = JSON.parse(data.toString());
-          if (msg.id && this.pending.has(msg.id)) {
-            const p = this.pending.get(msg.id)!;
-            this.pending.delete(msg.id);
-            if (msg.error) {
-              p.reject(new Error(msg.error.message));
-            } else {
-              p.resolve(msg.result);
-            }
-          }
-        } catch {}
-      });
-
-      ws.on('close', () => {
-        this.ws = null;
-        this.pageWsUrl = '';
-      });
-
-      ws.on('error', (err) => {
-        reject(err);
-      });
-    });
-  }
-
-  private sendCdp(method: string, params: any = {}): Promise<any> {
-    return new Promise(async (resolve, reject) => {
-      const ws = await this.ensureWs();
-      const id = ++this.msgId;
-
-      this.pending.set(id, { resolve, reject });
-
-      ws.send(JSON.stringify({ id, method, params }));
-
-      // Timeout
-      setTimeout(() => {
-        if (this.pending.has(id)) {
-          this.pending.delete(id);
-          reject(new Error('CDP timeout'));
-        }
-      }, 15000);
-    });
-  }
-
   async query<T = unknown>(graphQLQuery: GraphQLQuery): Promise<GraphQLResponse<T>> {
     const startTime = Date.now();
+    const body = JSON.stringify(graphQLQuery);
 
-    try {
-      const expression = `
-        (async () => {
-          const resp = await fetch("${this.endpoint}", {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/graphql-response+json' },
-            body: ${JSON.stringify(JSON.stringify(graphQLQuery))},
-            credentials: 'include',
-          });
-          if (!resp.ok) {
-            const text = await resp.text().catch(() => '');
-            throw new Error('HTTP ' + resp.status + ': ' + text.substring(0, 200));
+    return new Promise<GraphQLResponse<T>>((resolve, reject) => {
+      const url = new URL(this.endpoint);
+
+      const req = https.request({
+        hostname: url.hostname,
+        port: 443,
+        path: url.pathname,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/graphql-response+json',
+          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Origin': 'https://mudream.online',
+          'Referer': 'https://mudream.online/pt/market',
+          'Cookie': this.rawCookie,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          'Sec-Fetch-Dest': 'empty',
+          'Sec-Fetch-Mode': 'cors',
+          'Sec-Fetch-Site': 'same-origin',
+          'Content-Length': Buffer.byteLength(body),
+        },
+      }, (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk) => chunks.push(chunk));
+        res.on('end', () => {
+          const duration = Date.now() - startTime;
+          const rawBody = Buffer.concat(chunks).toString('utf-8');
+
+          if (res.statusCode !== 200) {
+            this.failedAttempts++;
+            console.error(`[GraphQL] ${graphQLQuery.operationName} FAILED em ${duration}ms: HTTP ${res.statusCode}`);
+            reject(new Error(`GraphQL request failed: ${res.statusCode} - ${rawBody.substring(0, 200)}`));
+            return;
           }
-          return resp.json();
-        })()
-      `;
 
-      const result = await this.sendCdp('Runtime.evaluate', {
-        expression,
-        awaitPromise: true,
-        returnByValue: true,
+          try {
+            const result = JSON.parse(rawBody) as GraphQLResponse<T>;
+            this.failedAttempts = 0;
+            console.log(`[GraphQL] ${graphQLQuery.operationName} OK em ${duration}ms`);
+            resolve(result);
+          } catch (e) {
+            this.failedAttempts++;
+            reject(new Error(`Failed to parse response: ${rawBody.substring(0, 300)}`));
+          }
+        });
       });
 
-      if (result.exceptionDetails) {
-        throw new Error(result.exceptionDetails.text || 'Evaluation failed');
-      }
+      req.on('error', (err) => {
+        const duration = Date.now() - startTime;
+        this.failedAttempts++;
+        console.error(`[GraphQL] ${graphQLQuery.operationName} ERRO em ${duration}ms:`, err.message);
+        reject(err);
+      });
 
-      const duration = Date.now() - startTime;
-      this.failedAttempts = 0;
-      console.log(`[GraphQL] ${graphQLQuery.operationName} OK em ${duration}ms`);
-      return result.result.value as GraphQLResponse<T>;
-    } catch (error: any) {
-      const duration = Date.now() - startTime;
-      this.failedAttempts++;
+      req.setTimeout(15000, () => {
+        req.destroy();
+        reject(new Error('Request timeout'));
+      });
 
-      // Reset connection on repeated failures
-      if (this.failedAttempts >= 3) {
-        this.ws?.close();
-        this.ws = null;
-        this.pageWsUrl = '';
-      }
-
-      console.error(`[GraphQL] ${graphQLQuery.operationName} ERRO em ${duration}ms (#${this.failedAttempts}): ${(error as Error).message?.substring(0, 150)}`);
-      throw error;
-    }
+      req.write(body);
+      req.end();
+    });
   }
 
   async close() {
-    this.ws?.close();
-    this.ws = null;
-    this.pageWsUrl = '';
-  }
-
-  async getItemsFromDOM(): Promise<any[]> {
-    try {
-      const expression = `
-        (function() {
-          const rows = document.querySelectorAll('[class*="MarketItem_tr"]');
-          return JSON.stringify(Array.from(rows).map(row => {
-            const nameEl = row.querySelector('[class*="MarketItem_name"]');
-            const optionsEls = row.querySelectorAll('[class*="MarketItem_option"]');
-            const imgEl = row.querySelector('[class*="MarketItem_img"] img, [class*="Item_item"] img');
-            return {
-              name: nameEl?.textContent?.trim() || '',
-              options: Array.from(optionsEls).map(el => el.textContent?.trim()).filter(Boolean),
-              imageUrl: imgEl?.src || '',
-            };
-          }));
-        })()
-      `;
-
-      const result = await this.sendCdp('Runtime.evaluate', {
-        expression,
-        returnByValue: true,
-      });
-
-      if (result.result?.value) {
-        return JSON.parse(result.result.value);
-      }
-      return [];
-    } catch {
-      return [];
-    }
-  }
-
-  async searchItems(term: string): Promise<any[]> {
-    try {
-      // Focus search input and type
-      await this.sendCdp('Runtime.evaluate', {
-        expression: `document.querySelector('input[placeholder*="Pesquisar"]')?.focus()`,
-        returnByValue: true,
-      });
-
-      await new Promise(r => setTimeout(r, 300));
-
-      // Clear and type using React setter
-      await this.sendCdp('Runtime.evaluate', {
-        expression: `
-          (function() {
-            const input = document.querySelector('input[placeholder*="Pesquisar"]');
-            if (!input) return;
-            const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-            setter.call(input, '${term.replace(/'/g, "\\'")}');
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-          })()
-        `,
-        returnByValue: true,
-      });
-
-      // Wait for results
-      await new Promise(r => setTimeout(r, 2000));
-
-      // Extract results
-      return await this.getItemsFromDOM();
-    } catch {
-      return [];
-    }
+    // Nothing to close for HTTP client
   }
 }
 

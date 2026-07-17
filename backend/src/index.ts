@@ -37,13 +37,12 @@ const io = new SocketServer(httpServer, {
 app.use(helmet());
 
 // CORS - handle multiple origins
-const allowedOrigins = config.cors.origin.split(',').map(o => o.trim());
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(null, true); // Allow all in development
+      callback(null, true);
     }
   },
   credentials: true,

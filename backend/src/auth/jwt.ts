@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
-import { User } from '../../../shared/src/types';
+import { User } from '../shared/types';
 
 export function generateTokens(user: User) {
   const accessToken = jwt.sign(

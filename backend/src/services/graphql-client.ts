@@ -1,5 +1,5 @@
 import { config } from '../config';
-import { GraphQLResponse, GraphQLQuery } from '../../../shared/src/types';
+import { GraphQLResponse, GraphQLQuery } from '../shared/types';
 import WebSocket from 'ws';
 
 const CDP_PORT = 9222;

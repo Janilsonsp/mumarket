@@ -1,7 +1,7 @@
 import { supabase } from '../database';
 import { graphqlClient } from './graphql-client';
-import { GraphQLQuery, Filter, FilterMatch } from '../../../shared/src/types';
-import { DEFAULT_POLLING_INTERVAL } from '../../../shared/src/constants';
+import { GraphQLQuery, Filter, FilterMatch } from '../shared/types';
+import { DEFAULT_POLLING_INTERVAL } from '../shared/constants';
 import { EventEmitter } from 'events';
 
 export class MarketMonitor extends EventEmitter {

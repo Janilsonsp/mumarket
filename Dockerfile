@@ -21,5 +21,5 @@ WORKDIR /app/backend
 # Expose port
 EXPOSE 3000
 
-# Start
-CMD ["node", "dist/index.js"]
+# Start - dist structure is dist/src/index.js
+CMD ["node", "dist/src/index.js"]

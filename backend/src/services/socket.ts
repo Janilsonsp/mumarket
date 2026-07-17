@@ -2,7 +2,7 @@ import { Server as SocketServer } from 'socket.io';
 import { Server as HttpServer } from 'http';
 import { verifyAccessToken } from '../auth/jwt';
 import { marketMonitor } from '../services/market-monitor';
-import { FilterMatch, MarketItem, MonitoringStatus } from '../../../shared/src/types';
+import { FilterMatch, MarketItem, MonitoringStatus } from '../shared/types';
 
 export function setupSocket(io: SocketServer) {
   const authenticatedSockets = new Map<string, string>();

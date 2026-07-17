@@ -16,9 +16,19 @@ import adminRoutes from './routes/admin';
 
 const app = express();
 const httpServer = createServer(app);
+
+// Parse CORS origins
+const allowedOrigins = config.cors.origin.split(',').map(o => o.trim());
+
 const io = new SocketServer(httpServer, {
   cors: {
-    origin: config.cors.origin,
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
     methods: ['GET', 'POST'],
     credentials: true,
   },

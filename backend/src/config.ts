@@ -1,8 +1,25 @@
-import dotenv from 'dotenv';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
-dotenv.config();
+// Load .env file if it exists (for local development)
+try {
+  const dotenvPath = join(__dirname, '..', '.env');
+  if (existsSync(dotenvPath)) {
+    const envContent = readFileSync(dotenvPath, 'utf-8');
+    envContent.split('\n').forEach(line => {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#')) {
+        const [key, ...valueParts] = trimmed.split('=');
+        if (key && valueParts.length > 0) {
+          const value = valueParts.join('=').trim();
+          if (!process.env[key.trim()]) {
+            process.env[key.trim()] = value;
+          }
+        }
+      }
+    });
+  }
+} catch {}
 
 const COOKIE_FILE = join(__dirname, '..', '.mudream-cookie');
 
@@ -29,9 +46,9 @@ export const config = {
   port: parseInt(process.env.PORT || '3001', 10),
   databaseUrl: process.env.DATABASE_URL || '',
   supabase: {
-    url: process.env.SUPABASE_URL!,
-    anonKey: process.env.SUPABASE_ANON_KEY!,
-    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    url: process.env.SUPABASE_URL || '',
+    anonKey: process.env.SUPABASE_ANON_KEY || '',
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
   },
   jwt: {
     secret: process.env.JWT_SECRET || 'fallback-secret-change-me',

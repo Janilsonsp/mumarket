@@ -2,10 +2,29 @@ import { createClient } from '@supabase/supabase-js';
 import { Pool } from 'pg';
 import { config } from './config';
 
-export const supabase = createClient(
-  config.supabase.url,
-  config.supabase.serviceRoleKey
-);
+// Create Supabase client only if URL is configured
+let supabaseClient: any = null;
+
+function getSupabase() {
+  if (!supabaseClient && config.supabase.url) {
+    supabaseClient = createClient(
+      config.supabase.url,
+      config.supabase.serviceRoleKey
+    );
+  }
+  return supabaseClient;
+}
+
+// Export for backward compatibility
+export const supabase = new Proxy({} as any, {
+  get: (_target, prop) => {
+    const client = getSupabase();
+    if (!client) {
+      throw new Error('Supabase not configured - set SUPABASE_URL environment variable');
+    }
+    return (client as any)[prop];
+  }
+});
 
 let pgPool: Pool | null = null;
 

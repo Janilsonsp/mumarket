@@ -1,4 +1,4 @@
-FROM node:20-slim
+FROM node:22-slim
 
 WORKDIR /app
 
@@ -21,5 +21,5 @@ WORKDIR /app/backend
 # Expose port
 EXPOSE 3000
 
-# Start - dist structure is dist/src/index.js
+# Start
 CMD ["node", "dist/src/index.js"]

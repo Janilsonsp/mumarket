@@ -1,7 +1,6 @@
 import { config } from '../config';
 import { GraphQLResponse, GraphQLQuery } from '../shared/types';
-import https from 'https';
-import http from 'http';
+import { gotScraping } from 'got-scraping';
 
 const CDP_PORT = 9222;
 
@@ -33,7 +32,7 @@ export class GraphQLClient {
         return true;
       }
     } catch {}
-    console.log('[GraphQL] Chrome CDP nao disponivel - usando HTTP direto');
+    console.log('[GraphQL] Chrome CDP nao disponivel - usando got-scraping');
     return false;
   }
 
@@ -87,72 +86,59 @@ export class GraphQLClient {
     });
   }
 
-  private queryViaHTTP<T = unknown>(graphQLQuery: GraphQLQuery): Promise<GraphQLResponse<T>> {
+  private async queryViaHTTP<T = unknown>(graphQLQuery: GraphQLQuery): Promise<GraphQLResponse<T>> {
     const startTime = Date.now();
     const body = JSON.stringify(graphQLQuery);
 
-    return new Promise((resolve, reject) => {
-      const url = new URL(this.endpoint);
-
-      const req = https.request({
-        hostname: url.hostname,
-        port: 443,
-        path: url.pathname,
+    try {
+      const response = await gotScraping({
         method: 'POST',
+        url: this.endpoint,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/graphql-response+json',
           'Origin': 'https://mudream.online',
           'Referer': 'https://mudream.online/pt/market',
           'Cookie': this.rawCookie,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-          'Content-Length': Buffer.byteLength(body),
         },
-      }, (res) => {
-        const chunks: Buffer[] = [];
-        res.on('data', (chunk) => chunks.push(chunk));
-        res.on('end', () => {
-          const duration = Date.now() - startTime;
-          const rawBody = Buffer.concat(chunks).toString('utf-8');
-
-          if (res.statusCode !== 200) {
-            this.failedAttempts++;
-            reject(new Error(`HTTP ${res.statusCode}`));
-            return;
-          }
-
-          try {
-            const result = JSON.parse(rawBody) as GraphQLResponse<T>;
-            this.failedAttempts = 0;
-            console.log(`[GraphQL] ${graphQLQuery.operationName} OK em ${duration}ms`);
-            resolve(result);
-          } catch (e) {
-            this.failedAttempts++;
-            reject(new Error(`Parse error: ${rawBody.substring(0, 200)}`));
-          }
-        });
+        body: body,
+        timeout: { request: 15000 },
       });
 
-      req.on('error', (err) => {
+      const duration = Date.now() - startTime;
+
+      if (response.statusCode !== 200) {
         this.failedAttempts++;
-        reject(err);
-      });
+        const snippet = response.body.substring(0, 200);
+        console.error(`[GraphQL] HTTP ${response.statusCode} em ${duration}ms: ${snippet}`);
+        throw new Error(`HTTP ${response.statusCode}`);
+      }
 
-      req.setTimeout(15000, () => { req.destroy(); reject(new Error('Timeout')); });
-      req.write(body);
-      req.end();
-    });
+      try {
+        const result = JSON.parse(response.body) as GraphQLResponse<T>;
+        this.failedAttempts = 0;
+        console.log(`[GraphQL] ${graphQLQuery.operationName} OK em ${duration}ms`);
+        return result;
+      } catch {
+        this.failedAttempts++;
+        throw new Error(`Parse error: ${response.body.substring(0, 200)}`);
+      }
+    } catch (err: any) {
+      const duration = Date.now() - startTime;
+      this.failedAttempts++;
+      console.error(`[GraphQL] got-scraping falhou em ${duration}ms: ${err.message}`);
+      throw err;
+    }
   }
 
   async query<T = unknown>(graphQLQuery: GraphQLQuery): Promise<GraphQLResponse<T>> {
-    // Check if CDP is available
     await this.checkCDP();
 
     if (this.useCDP) {
       try {
         return await this.queryViaCDP<T>(graphQLQuery);
       } catch (err) {
-        console.error('[GraphQL] CDP failed, tentando HTTP...');
+        console.error('[GraphQL] CDP failed, tentando got-scraping...');
         this.browserAvailable = false;
         this.useCDP = false;
       }

@@ -1,19 +1,16 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth, useSocket, useFilters } from '@/contexts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { formatNumber, formatDate, formatRelativeTime } from '@/lib/utils';
-import { queryMuDream } from '@/lib/api';
-import { Activity, Filter, Bell, Package, LogOut, Play, Square, RefreshCw, AlertTriangle } from 'lucide-react';
+import { formatRelativeTime } from '@/lib/utils';
+import { Activity, Filter, Bell, Package, LogOut, Play, Square, AlertTriangle } from 'lucide-react';
 
 export function DashboardPage() {
   const { user, logout } = useAuth();
   const { isConnected, monitoringStatus, monitoringError, latestMatches, latestItems, socket } = useSocket();
   const { filters } = useFilters();
   const [monitorMessage, setMonitorMessage] = useState<string | null>(null);
-  const [isPolling, setIsPolling] = useState(false);
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const activeFilters = filters.filter(f => f.isActive);
   const unreadMatches = latestMatches.filter(m => !m.isRead);
@@ -29,60 +26,7 @@ export function DashboardPage() {
     }
   }, [monitoringError]);
 
-  const poll = useCallback(async () => {
-    if (!socket) return;
-    try {
-      const query = {
-        operationName: 'GET_ALL_LOTS',
-        query: `query GET_ALL_LOTS($offset: NonNegativeInt, $limit: NonNegativeInt, $sort: LotsSortInput, $filter: LotsFilterInput) {
-          lots(limit: $limit, offset: $offset, sort: $sort, filter: $filter) {
-            Lots {
-              id source type gearScore
-              Prices { value Currency { code title } }
-              Currencies { code title }
-            }
-            Pagination { total }
-          }
-        }`,
-        variables: {
-          filter: {},
-          limit: 50,
-          offset: 0,
-          sort: { field: 'LOT_FIELD_UPDATED_AT', type: 'SORT_TYPE_DESC' },
-        },
-      };
-
-      const response = await queryMuDream(query);
-
-      // Handle MuDream GraphQL errors
-      if (response.errors && response.errors.length > 0) {
-        setMonitorMessage(`Erro GraphQL: ${response.errors[0].message}`);
-        return;
-      }
-
-      if (response.data?.lots?.Lots) {
-        const items = response.data.lots.Lots.map((lot: any) => ({
-          id: lot.id,
-          name: lot.source || 'Unknown',
-          type: lot.type || '',
-          gearScore: lot.gearScore || 0,
-          Prices: lot.Prices || [],
-          options: (lot.Currencies || []).map((c: any) => c.code?.toUpperCase() || ''),
-        }));
-
-        console.log(`[Monitor] ${items.length} itens obtidos`);
-        socket.emit('monitoring:data', items);
-        setMonitorMessage(`Monitorando... ${items.length} itens na tela`);
-      } else {
-        setMonitorMessage('Sem dados do MuDream');
-      }
-    } catch (err) {
-      console.error('[Monitor] Error:', err);
-      setMonitorMessage(`Erro: ${err instanceof Error ? err.message : 'Erro desconhecido'}`);
-    }
-  }, [socket]);
-
-  const startMonitoring = async () => {
+  const startMonitoring = () => {
     if (!socket) {
       setMonitorMessage('Socket nao conectado. Recarregue a pagina.');
       return;
@@ -95,32 +39,14 @@ export function DashboardPage() {
       setMonitorMessage('Crie pelo menos um filtro ativo antes de iniciar');
       return;
     }
-    setMonitorMessage('Iniciando monitoramento...');
     socket.emit('monitoring:start', 3000);
-
-    // Start polling immediately
-    if (pollingRef.current) clearInterval(pollingRef.current);
-    setIsPolling(true);
-    await poll();
-    pollingRef.current = setInterval(poll, 3000);
+    setMonitorMessage('Aguardando dados do bookmarklet...');
   };
 
   const stopMonitoring = () => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
-    setIsPolling(false);
     socket?.emit('monitoring:stop');
     setMonitorMessage('Monitoramento parado');
   };
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
-  }, []);
 
   return (
     <div className="min-h-screen bg-background">

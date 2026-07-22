@@ -79,7 +79,7 @@ export function DashboardPage() {
 
         console.log(`[Monitor] ${items.length} itens obtidos`);
         socket.emit('monitoring:data', items);
-        setMonitorMessage(`Monitorando... ${items.length} itens`);
+        setMonitorMessage(`Monitorando... ${items.length} itens na tela`);
       } else {
         console.log('[Monitor] Sem dados:', response);
         setMonitorMessage('Sem dados do MuDream');
@@ -90,8 +90,15 @@ export function DashboardPage() {
     }
   }, [socket]);
 
-  const startMonitoring = () => {
-    if (!socket) return;
+  const startMonitoring = async () => {
+    if (!socket) {
+      setMonitorMessage('Socket nao conectado. Recarregue a pagina.');
+      return;
+    }
+    if (!isConnected) {
+      setMonitorMessage('Conexao com servidor perdida. Recarregue a pagina.');
+      return;
+    }
     if (activeFilters.length === 0) {
       setMonitorMessage('Crie pelo menos um filtro ativo antes de iniciar');
       return;
@@ -101,10 +108,9 @@ export function DashboardPage() {
 
     // Start polling immediately
     if (pollingRef.current) clearInterval(pollingRef.current);
-    poll(); // First poll immediately
-    pollingRef.current = setInterval(poll, 3000);
     setIsPolling(true);
-    setMonitorMessage('Monitorando...');
+    await poll();
+    pollingRef.current = setInterval(poll, 3000);
   };
 
   const stopMonitoring = () => {

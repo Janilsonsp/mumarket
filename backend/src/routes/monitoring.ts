@@ -1,8 +1,86 @@
 import { Router, Response } from 'express';
 import { supabase } from '../database';
 import { AuthRequest, authMiddleware } from '../auth/middleware';
+import { verifyAccessToken } from '../auth/jwt';
 
 const router = Router();
+
+// Public endpoint for bookmarklet - accepts market data with token in body
+router.post('/bookmarklet', async (req: AuthRequest, res: Response) => {
+  try {
+    const { token, items } = req.body;
+    if (!token || !items || !Array.isArray(items)) {
+      return res.status(400).json({ error: 'token and items[] required' });
+    }
+
+    let userId: string;
+    try {
+      const decoded = verifyAccessToken(token);
+      userId = decoded.userId;
+    } catch {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Get user's active filters
+    const { data: filters } = await supabase
+      .from('filters')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true);
+
+    if (!filters || filters.length === 0) {
+      return res.json({ matches: 0, itemsReceived: items.length });
+    }
+
+    const matches: any[] = [];
+
+    for (const item of items) {
+      for (const filter of filters) {
+        const itemName = (item.name || '').toLowerCase();
+        const filterItemName = (filter.item_name || '').toLowerCase();
+
+        if (filterItemName && !itemName.includes(filterItemName) && !filterItemName.includes(itemName)) continue;
+
+        if (filter.category) {
+          const itemCategory = (item.type || '').toLowerCase();
+          const filterCat = filter.category.toLowerCase().replace(/s$/, '');
+          if (itemCategory && !itemCategory.includes(filterCat) && !filterCat.includes(itemCategory)) continue;
+        }
+
+        if (filter.excellent_options && filter.excellent_options.length > 0) {
+          const itemOpts = (item.options || []).map((o: string) => o.toLowerCase());
+          const required = filter.excellent_options.map((o: string) => o.toLowerCase());
+          const matchType = filter.options_match_type || 'and';
+          if (matchType === 'and') {
+            if (required.some((r: string) => !itemOpts.some((o: string) => o.includes(r)))) continue;
+          } else {
+            if (!required.some((r: string) => itemOpts.some((o: string) => o.includes(r)))) continue;
+          }
+        }
+
+        const prices = (item.Prices || []).map((p: any) => ({
+          value: p.value,
+          currency: p.Currency?.code || p.Currency?.title || '',
+        }));
+
+        matches.push({
+          filterId: filter.id,
+          filterName: filter.name,
+          itemName: item.name,
+          prices,
+          matchedAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    res.json({ matches: matches.length, itemsReceived: items.length, details: matches });
+  } catch (error) {
+    console.error('[Bookmarklet] Error:', error);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// Authenticated routes below
 router.use(authMiddleware);
 
 router.get('/matches', async (req: AuthRequest, res: Response) => {

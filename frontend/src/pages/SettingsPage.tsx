@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Settings, Check, Bookmark, Copy } from 'lucide-react';
+import { Settings, Check, Copy, Terminal } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -10,19 +10,22 @@ export function SettingsPage() {
   const { token } = useAuth();
   const [copied, setCopied] = useState(false);
 
-  const getBookmarkletURL = () => {
+  const getMonitorCode = () => {
     const monitorURL = window.location.origin + '/monitor.js';
-    // The bookmarklet sets config then loads the script
-    const loader = `javascript:void(function(){window._muMarketConfig={token:'${token}',api:'${API_URL}'};var s=document.createElement('script');s.src='${monitorURL}';document.body.appendChild(s)})()`;
-    return loader;
+    return `// MuMarket Monitor - Cole no Console do DevTools (F12) no mudream.online
+// 1. Abra mudream.online/pt/market e faca login
+// 2. Pressione F12 → aba Console
+// 3. Cole este codigo e pressione Enter
+// 4. Para parar, cole novamente
+
+window._muMarketConfig={token:'${token}',api:'${API_URL}'};
+var s=document.createElement('script');
+s.src='${monitorURL}';
+document.body.appendChild(s);`;
   };
 
-  const getMonitorScriptURL = () => {
-    return window.location.origin + '/monitor.js';
-  };
-
-  const copyBookmarklet = async () => {
-    const code = getBookmarkletURL();
+  const copyCode = async () => {
+    const code = getMonitorCode();
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
@@ -37,13 +40,6 @@ export function SettingsPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 3000);
     }
-  };
-
-  const copyMonitorScript = async () => {
-    const url = getMonitorScriptURL();
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch {}
   };
 
   return (
@@ -64,8 +60,8 @@ export function SettingsPage() {
         <Card className="border-primary/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Bookmark className="w-5 h-5 text-primary" />
-              <span>Monitor via Bookmarklet</span>
+              <Terminal className="w-5 h-5 text-primary" />
+              <span>Monitor MuDream</span>
             </CardTitle>
             <CardDescription>
               O monitor roda DENTRO do MuDream, contornando Cloudflare e CORS automaticamente.
@@ -75,31 +71,26 @@ export function SettingsPage() {
             <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground space-y-2">
               <p className="font-medium text-foreground">Como usar:</p>
               <ol className="list-decimal list-inside space-y-1">
-                <li>Clique em <strong>Copiar Favorito</strong> abaixo</li>
-                <li>Clique com <strong>botao direito</strong> na barra de favoritos do navegador</li>
-                <li>Selecione <strong>Adicionar pagina</strong></li>
-                <li>Nome: <strong>MuMarket Monitor</strong></li>
-                <li>URL: <strong>cole o codigo copiado</strong> e salve</li>
+                <li>Clique em <strong>Copiar Codigo</strong> abaixo</li>
                 <li>Abra <a href="https://mudream.online/pt/market" target="_blank" className="text-primary underline">mudream.online/pt/market</a> e faca login</li>
-                <li><strong>Clique no favorito</strong> MuMarket Monitor</li>
-                <li>O titulo da aba mostrara "[MuMarket] X itens"</li>
+                <li>Pressione <strong>F12</strong> para abrir o DevTools</li>
+                <li>Va na aba <strong>Console</strong></li>
+                <li><strong>Cole o codigo</strong> e pressione <strong>Enter</strong></li>
+                <li>O titulo da aba mostrara "[MuMarket] X itens" quando estiver funcionando</li>
+                <li>Mantenha esta aba aberta enquanto quiser monitorar</li>
               </ol>
             </div>
 
-            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 text-sm text-yellow-600">
-              <strong>IMPORTANTE:</strong> Nao cole na barra de endereco! Crie um favorito primeiro, depois clique nele.
-            </div>
-
-            <Button onClick={copyBookmarklet} className="gap-2">
+            <Button onClick={copyCode} className="gap-2">
               {copied ? (
                 <><Check className="w-4 h-4" /> Copiado!</>
               ) : (
-                <><Copy className="w-4 h-4" /> Copiar Favorito</>
+                <><Copy className="w-4 h-4" /> Copiar Codigo</>
               )}
             </Button>
 
             <p className="text-xs text-muted-foreground">
-              Para parar, clique novamente no favorito.
+              Para parar, cole o mesmo codigo novamente no Console.
             </p>
           </CardContent>
         </Card>
@@ -110,11 +101,10 @@ export function SettingsPage() {
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-3">
             <p><strong>1.</strong> Va em <strong>Filtros</strong> e crie filtros para os itens que deseja monitorar</p>
-            <p><strong>2.</strong> Copie o favorito acima</p>
-            <p><strong>3.</strong> Crie um favorito: botao direito na barra de favoritos &gt; Adicionar pagina &gt; URL = codigo copiado</p>
-            <p><strong>4.</strong> Abra o MuDream Market, faca login</p>
-            <p><strong>5.</strong> Clique no favorito MuMarket Monitor</p>
-            <p><strong>6.</strong> Mantenha a aba do MuDream aberta - os alertas aparecerao automaticamente</p>
+            <p><strong>2.</strong> Copie o codigo acima</p>
+            <p><strong>3.</strong> Abra o MuDream Market, faca login</p>
+            <p><strong>4.</strong> Pressione F12, va na aba Console, cole o codigo e Enter</p>
+            <p><strong>5.</strong> Mantenha a aba do MuDream aberta - os alertas aparecerao automaticamente</p>
           </CardContent>
         </Card>
       </main>

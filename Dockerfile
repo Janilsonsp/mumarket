@@ -9,17 +9,18 @@ COPY package.json package-lock.json ./
 COPY backend/ ./backend/
 COPY shared/ ./shared/
 
-# Install all dependencies (skip missing frontend workspace)
-RUN npm install --workspaces --if-present || npm install
+# Create dummy frontend package.json so npm workspaces doesn't fail
+RUN mkdir -p frontend && echo '{"name":"frontend","private":true,"version":"0.0.0"}' > frontend/package.json
 
-# Build shared types first, then backend
-RUN cd shared && npm install 2>/dev/null; cd ../backend && npm run build
+# Install all workspace dependencies
+RUN npm install
 
-# Set working directory to backend
+# Build backend (tsc compiles backend + resolves shared types)
+RUN cd backend && npm run build
+
+# Railway provides PORT env var (default 8080)
+EXPOSE ${PORT:-8080}
+
 WORKDIR /app/backend
 
-# Expose port
-EXPOSE 3000
-
-# Start
 CMD ["node", "dist/src/index.js"]

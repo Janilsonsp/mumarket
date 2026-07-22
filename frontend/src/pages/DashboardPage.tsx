@@ -53,6 +53,19 @@ export function DashboardPage() {
       };
 
       const response = await queryMuDream(query);
+      console.log('[Monitor] Response:', JSON.stringify(response).substring(0, 500));
+
+      // Handle proxy error response
+      if (response.error) {
+        setMonitorMessage(`Erro proxy: ${response.error}`);
+        return;
+      }
+
+      // Handle MuDream GraphQL errors
+      if (response.errors && response.errors.length > 0) {
+        setMonitorMessage(`Erro GraphQL: ${response.errors[0].message}`);
+        return;
+      }
 
       if (response.data?.lots?.Lots) {
         const items = response.data.lots.Lots.map((lot: any) => ({
@@ -64,10 +77,12 @@ export function DashboardPage() {
           options: (lot.Currencies || []).map((c: any) => c.code?.toUpperCase() || ''),
         }));
 
+        console.log(`[Monitor] ${items.length} itens obtidos`);
         socket.emit('monitoring:data', items);
         setMonitorMessage(`Monitorando... ${items.length} itens`);
-      } else if (response.body?.error) {
-        setMonitorMessage(`Erro MuDream: ${response.body.error}`);
+      } else {
+        console.log('[Monitor] Sem dados:', response);
+        setMonitorMessage('Sem dados do MuDream');
       }
     } catch (err) {
       console.error('[Monitor] Error:', err);

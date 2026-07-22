@@ -8,57 +8,31 @@ export function getSocketUrl(): string {
   return import.meta.env.VITE_API_URL || window.location.origin;
 }
 
-// Try multiple approaches to query MuDream API
+// Query MuDream directly from browser
+// Cloudflare allows because browser has cf_clearance + real TLS
+// CORS may block reading the response
 export async function queryMuDream(graphQLQuery: GraphQLQuery): Promise<any> {
-  const body = JSON.stringify(graphQLQuery);
+  const resp = await fetch('https://mudream.online/api/graphql', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/graphql-response+json',
+    },
+    body: JSON.stringify(graphQLQuery),
+    credentials: 'include',
+  });
 
-  // Approach 1: Direct fetch (works if CORS headers are present)
-  try {
-    const resp = await fetch('https://mudream.online/api/graphql', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/graphql-response+json',
-      },
-      body: body,
-      credentials: 'include',
-    });
-    if (resp.ok) {
-      const text = await resp.text();
-      return JSON.parse(text);
-    }
-  } catch {}
+  if (!resp.ok) {
+    throw new Error(`HTTP ${resp.status}`);
+  }
 
-  // Approach 2: Via allorigins proxy (adds CORS headers)
-  try {
-    const resp = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent('https://mudream.online/api/graphql'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: body,
-    });
-    if (resp.ok) {
-      const text = await resp.text();
-      return JSON.parse(text);
-    }
-  } catch {}
+  // Check if CORS blocked the response
+  if (resp.type === 'opaque') {
+    throw new Error('CORS bloqueou a resposta. Abra mudream.online em outra aba e faca login primeiro.');
+  }
 
-  // Approach 3: Via corsproxy.io
-  try {
-    const resp = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://mudream.online/api/graphql'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/graphql-response+json',
-      },
-      body: body,
-    });
-    if (resp.ok) {
-      const text = await resp.text();
-      return JSON.parse(text);
-    }
-  } catch {}
-
-  throw new Error('Todos os proxies bloqueados pelo Cloudflare. Use o Console do DevTools (F12) no mudream.online.');
+  const text = await resp.text();
+  return JSON.parse(text);
 }
 
 interface GraphQLQuery {

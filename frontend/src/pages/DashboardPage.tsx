@@ -61,7 +61,14 @@ export function DashboardPage() {
       }
     } catch (err) {
       console.error('[Monitor] Error:', err);
-      setMonitorMessage(`Erro: ${err instanceof Error ? err.message : 'Erro desconhecido'}`);
+      const msg = err instanceof Error ? err.message : 'Erro desconhecido';
+      if (msg.includes('CORS') || msg.includes('Failed to fetch') || msg.includes('opaque')) {
+        setMonitorMessage('CORS bloqueou acesso ao MuDream. Abra mudream.online em outra aba e faca login, depois volte e clique Iniciar novamente.');
+      } else if (msg.includes('HTTP 403')) {
+        setMonitorMessage('Cloudflare bloqueou. Abra mudream.online e faca login para obter cf_clearance.');
+      } else {
+        setMonitorMessage(`Erro: ${msg}`);
+      }
     }
   }, [socket]);
 

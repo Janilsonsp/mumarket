@@ -58,7 +58,7 @@ export const config = {
     url: process.env.REDIS_URL || 'redis://localhost:6379',
   },
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173,https://frontend-f8vp7opm4-jajasp-6605s-projects.vercel.app,https://mumarket.jdwebstudio.com.br',
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5173,https://mumarket.jdwebstudio.com.br',
   },
   mudream: {
     graphqlEndpoint: process.env.MUDREAM_GRAPHQL_ENDPOINT || 'https://mudream.online/api/graphql',

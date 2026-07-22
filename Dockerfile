@@ -18,8 +18,8 @@ RUN npm install
 # Build backend (tsc compiles backend + resolves shared types)
 RUN cd backend && npm run build
 
-# Railway provides PORT env var (default 8080)
-EXPOSE ${PORT:-8080}
+# Railway sets PORT env var
+EXPOSE 8080
 
 WORKDIR /app/backend
 

@@ -40,24 +40,22 @@ router.post('/bookmarklet', async (req: AuthRequest, res: Response) => {
         const itemName = (item.name || '').toLowerCase();
         const filterItemName = (filter.item_name || '').toLowerCase();
 
-        if (filterItemName && !itemName.includes(filterItemName) && !filterItemName.includes(itemName)) continue;
+        // Match by item name (partial match)
+        if (filterItemName) {
+          // Extract just the item name part (before any "+" or options)
+          const cleanFilterName = filterItemName.split('+')[0].trim();
+          const cleanItemName = itemName.split('+')[0].trim();
+          if (!cleanItemName.includes(cleanFilterName) && !cleanFilterName.includes(cleanItemName)) continue;
+        }
 
+        // Match by category
         if (filter.category) {
           const itemCategory = (item.type || '').toLowerCase();
           const filterCat = filter.category.toLowerCase().replace(/s$/, '');
           if (itemCategory && !itemCategory.includes(filterCat) && !filterCat.includes(itemCategory)) continue;
         }
 
-        if (filter.excellent_options && filter.excellent_options.length > 0) {
-          const itemOpts = (item.options || []).map((o: string) => o.toLowerCase());
-          const required = filter.excellent_options.map((o: string) => o.toLowerCase());
-          const matchType = filter.options_match_type || 'and';
-          if (matchType === 'and') {
-            if (required.some((r: string) => !itemOpts.some((o: string) => o.includes(r)))) continue;
-          } else {
-            if (!required.some((r: string) => itemOpts.some((o: string) => o.includes(r)))) continue;
-          }
-        }
+        // Note: excellent_options matching skipped - MuDream GraphQL doesn't return them
 
         const prices = (item.Prices || []).map((p: any) => ({
           value: p.value,
@@ -77,6 +75,7 @@ router.post('/bookmarklet', async (req: AuthRequest, res: Response) => {
     // Broadcast items to connected clients via Socket.IO
     broadcastBookmarkletData(userId, items);
 
+    console.log(`[Bookmarklet] User ${userId}: ${items.length} items, ${matches.length} matches`);
     res.json({ matches: matches.length, itemsReceived: items.length, details: matches });
   } catch (error) {
     console.error('[Bookmarklet] Error:', error);

@@ -53,13 +53,6 @@ export function DashboardPage() {
       };
 
       const response = await queryMuDream(query);
-      console.log('[Monitor] Response:', JSON.stringify(response).substring(0, 500));
-
-      // Handle proxy error response
-      if (response.error) {
-        setMonitorMessage(`Erro proxy: ${response.error}`);
-        return;
-      }
 
       // Handle MuDream GraphQL errors
       if (response.errors && response.errors.length > 0) {
@@ -81,7 +74,6 @@ export function DashboardPage() {
         socket.emit('monitoring:data', items);
         setMonitorMessage(`Monitorando... ${items.length} itens na tela`);
       } else {
-        console.log('[Monitor] Sem dados:', response);
         setMonitorMessage('Sem dados do MuDream');
       }
     } catch (err) {

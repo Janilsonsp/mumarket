@@ -8,31 +8,25 @@ export function getSocketUrl(): string {
   return import.meta.env.VITE_API_URL || window.location.origin;
 }
 
-// GraphQL query via Vercel rewrite proxy (same-origin, no CORS)
-// Vercel rewrites /mudream-api/* → mudream.online/api/*
+// Direct browser fetch to MuDream - uses real TLS fingerprint + cf_clearance cookie
 export async function queryMuDream(graphQLQuery: GraphQLQuery): Promise<any> {
-  // Use Vercel rewrite as proxy (no CORS, same origin)
-  try {
-    const resp = await fetch('/mudream-api/graphql', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/graphql-response+json',
-      },
-      body: JSON.stringify(graphQLQuery),
-    });
+  const resp = await fetch('https://mudream.online/api/graphql', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/graphql-response+json',
+    },
+    body: JSON.stringify(graphQLQuery),
+    credentials: 'include',
+  });
 
-    const text = await resp.text();
+  const text = await resp.text();
 
-    try {
-      return JSON.parse(text);
-    } catch {
-      throw new Error(`Invalid response: ${text.substring(0, 200)}`);
-    }
-  } catch (err) {
-    console.error('[API] MuDream query failed:', err);
-    throw err;
+  if (!resp.ok) {
+    throw new Error(`MuDream HTTP ${resp.status}: ${text.substring(0, 200)}`);
   }
+
+  return JSON.parse(text);
 }
 
 interface GraphQLQuery {

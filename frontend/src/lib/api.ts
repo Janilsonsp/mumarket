@@ -8,21 +8,22 @@ export function getSocketUrl(): string {
   return import.meta.env.VITE_API_URL || window.location.origin;
 }
 
-// GraphQL query to MuDream directly from browser
+// GraphQL query via backend proxy (avoids CORS and Cloudflare issues)
 export async function queryMuDream(graphQLQuery: GraphQLQuery): Promise<any> {
-  const resp = await fetch('https://mudream.online/api/graphql', {
+  const token = localStorage.getItem('token');
+
+  const resp = await fetch(`${API_URL}/api/config/mudream-proxy`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Accept': 'application/graphql-response+json',
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(graphQLQuery),
-    credentials: 'include',
   });
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => '');
-    throw new Error(`GraphQL failed: ${resp.status} - ${text.substring(0, 200)}`);
+    throw new Error(`GraphQL proxy failed: ${resp.status} - ${text.substring(0, 200)}`);
   }
 
   return resp.json();

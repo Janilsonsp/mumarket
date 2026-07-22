@@ -166,7 +166,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     // Start monitoring loop - query MuDream directly from browser (bypasses Cloudflare)
     let monitoringInterval: ReturnType<typeof setInterval> | null = null;
 
-    newSocket.on('monitoring:start', (interval?: number) => {
+    const startPolling = (interval: number = 3000) => {
       if (monitoringInterval) clearInterval(monitoringInterval);
 
       const poll = async () => {
@@ -212,15 +212,28 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       };
 
       poll();
-      monitoringInterval = setInterval(poll, interval || 3000);
-    });
+      monitoringInterval = setInterval(poll, interval);
+    };
 
-    newSocket.on('monitoring:stop', () => {
+    const stopPolling = () => {
       if (monitoringInterval) {
         clearInterval(monitoringInterval);
         monitoringInterval = null;
       }
+    };
+
+    // Also listen for server-side start/stop events
+    newSocket.on('monitoring:start', (interval?: number) => {
+      startPolling(interval || 3000);
     });
+
+    newSocket.on('monitoring:stop', () => {
+      stopPolling();
+    });
+
+    // Expose start/stop polling via socket for DashboardPage
+    (newSocket as any).__startPolling = startPolling;
+    (newSocket as any).__stopPolling = stopPolling;
 
     setSocket(newSocket);
 

@@ -34,10 +34,13 @@ export function DashboardPage() {
     }
     setMonitorMessage('Iniciando monitoramento...');
     socket.emit('monitoring:start', 3000);
+    // Start polling directly from browser (bypasses Cloudflare)
+    (socket as any).__startPolling?.(3000);
   };
 
   const stopMonitoring = () => {
     socket?.emit('monitoring:stop');
+    (socket as any).__stopPolling?.();
     setMonitorMessage('Monitoramento parado');
   };
 

@@ -63,10 +63,13 @@ export function SettingsPage() {
               <p className="font-medium text-foreground">Como usar:</p>
               <ol className="list-decimal list-inside space-y-1">
                 <li>Clique em <strong>Copiar Bookmarklet</strong> abaixo</li>
-                <li>Abra <a href="https://mudream.online/pt/market" target="_blank" className="text-primary underline">mudream.online/pt/market</a> e faca login</li>
-                <li>Na barra de endereco, cole o codigo e pressione Enter</li>
+                <li>Clique com botao direito na <strong>barra de favoritos</strong> do navegador</li>
+                <li>Selecione <strong>Adicionar pagina</strong> (ou "Adicionar aos favoritos")</li>
+                <li>Nome: <strong>MuMarket Monitor</strong></li>
+                <li>URL: <strong>cole o codigo copiado</strong></li>
+                <li>Salve e abra <a href="https://mudream.online/pt/market" target="_blank" className="text-primary underline">mudream.online/pt/market</a></li>
+                <li>Faca login e <strong>clique no bookmark</strong> que criou</li>
                 <li>O titulo da aba mostrara "[MuMarket] X itens" quando estiver funcionando</li>
-                <li>Mantenha esta aba aberta enquanto quiser monitorar</li>
               </ol>
             </div>
 
@@ -79,7 +82,7 @@ export function SettingsPage() {
             </Button>
 
             <p className="text-xs text-muted-foreground">
-              Para parar, clique novamente no bookmarklet na barra de endereco.
+              IMPORTANTE: Nao cole na barra de endereco! Crie um favorito e clique nele.
             </p>
           </CardContent>
         </Card>
@@ -91,9 +94,10 @@ export function SettingsPage() {
           <CardContent className="text-sm text-muted-foreground space-y-3">
             <p><strong>1.</strong> Va em <strong>Filtros</strong> e crie filtros para os itens que deseja monitorar</p>
             <p><strong>2.</strong> Copie o bookmarklet acima</p>
-            <p><strong>3.</strong> Abra o MuDream Market e faca login</p>
-            <p><strong>4.</strong> Cole o bookmarklet na barra de endereco e pressione Enter</p>
-            <p><strong>5.</strong> Mantenha a aba do MuDream aberta - os alertas aparecerao automaticamente</p>
+            <p><strong>3.</strong> Crie um favorito: botao direito na barra de favoritos &gt; Adicionar pagina &gt; URL = codigo copiado</p>
+            <p><strong>4.</strong> Abra o MuDream Market, faca login</p>
+            <p><strong>5.</strong> Clique no bookmark favorito que criou</p>
+            <p><strong>6.</strong> Mantenha a aba do MuDream aberta - os alertas aparecerao automaticamente</p>
           </CardContent>
         </Card>
       </main>

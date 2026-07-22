@@ -205,12 +205,17 @@ const FilterContext = createContext<FilterContextType | undefined>(undefined);
 
 export function FilterProvider({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
+  const { socket } = useSocket();
   const [filters, setFilters] = useState<Filter[]>([]);
   const [loading, setLoading] = useState(true);
 
   const headers = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${token}`,
+  };
+
+  const notifyFiltersChanged = () => {
+    socket?.emit('filters:changed');
   };
 
   const fetchFilters = async () => {
@@ -235,11 +240,12 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
     if (!response.ok) throw new Error('Failed to create filter');
     const newFilter = await response.json();
     setFilters(prev => [newFilter, ...prev]);
+    notifyFiltersChanged();
     return newFilter;
   };
 
   const updateFilter = async (id: string, filter: Partial<Filter>): Promise<Filter> => {
-    const response = await fetch(`/api/filters/${id}`, {
+    const response = await fetch(`${API_URL}/api/filters/${id}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify(filter),
@@ -247,26 +253,29 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
     if (!response.ok) throw new Error('Failed to update filter');
     const updated = await response.json();
     setFilters(prev => prev.map(f => f.id === id ? updated : f));
+    notifyFiltersChanged();
     return updated;
   };
 
   const deleteFilter = async (id: string) => {
-    const response = await fetch(`/api/filters/${id}`, {
+    const response = await fetch(`${API_URL}/api/filters/${id}`, {
       method: 'DELETE',
       headers,
     });
     if (!response.ok) throw new Error('Failed to delete filter');
     setFilters(prev => prev.filter(f => f.id !== id));
+    notifyFiltersChanged();
   };
 
   const toggleFilter = async (id: string) => {
-    const response = await fetch(`/api/filters/${id}/toggle`, {
+    const response = await fetch(`${API_URL}/api/filters/${id}/toggle`, {
       method: 'PATCH',
       headers,
     });
     if (!response.ok) throw new Error('Failed to toggle filter');
     const updated = await response.json();
     setFilters(prev => prev.map(f => f.id === id ? updated : f));
+    notifyFiltersChanged();
   };
 
   useEffect(() => {

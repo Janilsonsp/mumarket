@@ -102,6 +102,10 @@ export function setupSocket(io: SocketServer) {
       socket.emit('monitoring:status', { isOnline: true, error: errorMessage });
     });
 
+    socket.on('filters:changed', () => {
+      marketMonitor.refreshFilters();
+    });
+
     socket.on('disconnect', () => {
       console.log(`[Socket] Client disconnected: ${socket.id}`);
       authenticatedSockets.delete(socket.id);

@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { User, Filter, MarketItem, FilterMatch, MonitoringStatus } from '../shared/types';
-import { queryMuDream } from '../lib/api';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -161,51 +160,6 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
     newSocket.on('market:update', (items: MarketItem[]) => {
       setLatestItems(items);
-    });
-
-    // Start monitoring loop - query MuDream directly from browser
-    let monitoringInterval: ReturnType<typeof setInterval> | null = null;
-
-    newSocket.on('monitoring:start', (interval?: number) => {
-      if (monitoringInterval) clearInterval(monitoringInterval);
-      
-      const poll = async () => {
-        try {
-          const query = {
-            operationName: 'GetMarketItems',
-            query: `query GetMarketItems { lots(limit: 50, offset: 0, sort: {field: LOT_FIELD_UPDATED_AT, type: SORT_TYPE_DESC}) { Lots { id source type gearScore Prices { value Currency { code title } } Currencies { code title } } Pagination { total } } }`,
-            variables: {}
-          };
-          
-          const response = await queryMuDream(query);
-          
-          if (response.data?.lots?.Lots) {
-            const items = response.data.lots.Lots.map((lot: any) => ({
-              id: lot.id,
-              name: lot.source || 'Unknown',
-              type: lot.type || '',
-              gearScore: lot.gearScore || 0,
-              Prices: lot.Prices || [],
-              options: (lot.Currencies || []).map((c: any) => c.code?.toUpperCase() || ''),
-            }));
-            
-            newSocket.emit('monitoring:data', items);
-          }
-        } catch (err) {
-          console.error('[Monitor] Error:', err);
-          newSocket.emit('monitoring:error', err instanceof Error ? err.message : 'Unknown error');
-        }
-      };
-
-      poll();
-      monitoringInterval = setInterval(poll, interval || 3000);
-    });
-
-    newSocket.on('monitoring:stop', () => {
-      if (monitoringInterval) {
-        clearInterval(monitoringInterval);
-        monitoringInterval = null;
-      }
     });
 
     setSocket(newSocket);

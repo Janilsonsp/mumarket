@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,10 +9,18 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 export function SettingsPage() {
   const { token } = useAuth();
   const [copied, setCopied] = useState(false);
+  const linkRef = useRef<HTMLAnchorElement>(null);
 
   const getMonitorCode = () => {
-    return `(function(){if(window._mm){clearInterval(window._mm);window._mm=null;document.title=document.title.replace(/\\[MuMarket\\][^]*/g,'').trim();alert('PARADO');return}var T='${token}';var A='${API_URL}';var q={operationName:'GET_ALL_LOTS',query:'query GET_ALL_LOTS{lots(limit:50,offset:0,sort:{field:LOT_FIELD_UPDATED_AT,type:SORT_TYPE_DESC}){Lots{id source type gearScore Prices{value Currency{code title}} Currencies{code title}} Pagination{total}}}',variables:{}};function p(){fetch('https://mudream.online/api/graphql',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/graphql-response+json'},body:JSON.stringify(q),credentials:'include'}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}).then(function(d){if(d.data&&d.data.lots&&d.data.lots.Lots){var items=d.data.lots.Lots.map(function(l){return{id:l.id,name:l.source||'?',type:l.type||'',gearScore:l.gearScore||0,Prices:l.Prices||[],options:(l.Currencies||[]).map(function(c){return(c.code||'').toUpperCase()})}});document.title='[MuMarket] '+items.length+' itens';return fetch(A+'/api/monitoring/bookmarklet',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:T,items:items})})}}).then(function(r){if(r)return r.json()}).then(function(d){if(d&&d.matches>0){document.title='[MuMarket] '+d.matches+' MATCHES!';if('Notification' in window&&Notification.permission==='granted')new Notification('MuMarket!',{body:d.matches+' itens!'});else if('Notification' in window&&Notification.permission!=='denied')Notification.requestPermission()}}).catch(function(e){console.error('[MuMarket]',e.message)})}p();window._mm=setInterval(p,3000);alert('Monitor INICIADO! Mantenha esta aba aberta.')})()`;
+    return `javascript:void(function(){if(window._mm){clearInterval(window._mm);window._mm=null;document.title=document.title.replace(/\\[MuMarket\\][^]*/g,'').trim();alert('PARADO');return}var T='${token}';var A='${API_URL}';var q={operationName:'GET_ALL_LOTS',query:'query GET_ALL_LOTS{lots(limit:50,offset:0,sort:{field:LOT_FIELD_UPDATED_AT,type:SORT_TYPE_DESC}){Lots{id source type gearScore Prices{value Currency{code title}} Currencies{code title}} Pagination{total}}}',variables:{}};function p(){fetch('https://mudream.online/api/graphql',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/graphql-response+json'},body:JSON.stringify(q),credentials:'include'}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}).then(function(d){if(d.data&&d.data.lots&&d.data.lots.Lots){var items=d.data.lots.Lots.map(function(l){return{id:l.id,name:l.source||'?',type:l.type||'',gearScore:l.gearScore||0,Prices:l.Prices||[],options:(l.Currencies||[]).map(function(c){return(c.code||'').toUpperCase()})}});document.title='[MuMarket] '+items.length+' itens';return fetch(A+'/api/monitoring/bookmarklet',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:T,items:items})})}}).then(function(r){if(r)return r.json()}).then(function(d){if(d&&d.matches>0){document.title='[MuMarket] '+d.matches+' MATCHES!';if('Notification' in window&&Notification.permission==='granted')new Notification('MuMarket!',{body:d.matches+' itens!'});else if('Notification' in window&&Notification.permission!=='denied')Notification.requestPermission()}}).catch(function(e){console.error('[MuMarket]',e.message)})}p();window._mm=setInterval(p,3000);alert('Monitor INICIADO! Mantenha esta aba aberta.')})()`;
   };
+
+  // Set href directly on DOM element to avoid React URL encoding
+  useEffect(() => {
+    if (linkRef.current) {
+      linkRef.current.href = getMonitorCode();
+    }
+  }, [token]);
 
   const copyCode = async () => {
     const code = getMonitorCode();
@@ -54,35 +62,34 @@ export function SettingsPage() {
               <span>Ativar Monitor</span>
             </CardTitle>
             <CardDescription>
-              O monitor precisa rodar DENTRO do MuDream (mesma pagina) por causa do Cloudflare. 
-              Arraste o link abaixo para sua barra de favoritos.
+              O monitor precisa rodar DENTRO do MuDream por causa do Cloudflare. 
+              Clique com botao direito no link abaixo e selecione "Salvar link como favorito".
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground space-y-3">
               <p className="font-medium text-foreground">Como ativar (3 passos):</p>
               <ol className="list-decimal list-inside space-y-1">
-                <li><strong>Arraste</strong> o link abaixo para sua barra de favoritos</li>
+                <li><strong>Clique com botao direito</strong> no link abaixo e selecione <strong>"Salvar link como"</strong> ou <strong>"Adicionar aos favoritos"</strong></li>
                 <li>Abra <a href="https://mudream.online/pt/market" target="_blank" className="text-primary underline">mudream.online/pt/market</a> e faca login</li>
-                <li><strong>Clique</strong> no favorito que criou</li>
+                <li><strong>Clique</strong> no favorito que salvou</li>
               </ol>
               <p className="text-xs text-muted-foreground mt-2">
                 O titulo da aba mudara para "[MuMarket] X itens" quando estiver funcionando.
-                Para parar, clique no favorito novamente.
               </p>
             </div>
 
             <div className="border-2 border-dashed border-primary/50 rounded-lg p-6 text-center">
-              <p className="text-sm text-muted-foreground mb-3">Arraste este link para a barra de favoritos:</p>
+              <p className="text-sm text-muted-foreground mb-3">Clique com botao direito e salve como favorito:</p>
               <a
-                href={getMonitorCode()}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors cursor-grab active:cursor-grabbing"
+                ref={linkRef}
+                href="#"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
                 onClick={(e) => e.preventDefault()}
               >
                 <Play className="w-4 h-4" />
                 MuMarket Monitor
               </a>
-              <p className="text-xs text-muted-foreground mt-2">↓ Arraste para cima ↓</p>
             </div>
 
             <div className="text-center">

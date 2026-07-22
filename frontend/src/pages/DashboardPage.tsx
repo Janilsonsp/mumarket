@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth, useSocket, useFilters } from '@/contexts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatNumber, formatDate, formatRelativeTime } from '@/lib/utils';
+import { queryMuDream } from '@/lib/api';
 import { Activity, Filter, Bell, Package, LogOut, Play, Square, RefreshCw, AlertTriangle } from 'lucide-react';
 
 export function DashboardPage() {
@@ -11,6 +12,8 @@ export function DashboardPage() {
   const { isConnected, monitoringStatus, monitoringError, latestMatches, latestItems, socket } = useSocket();
   const { filters } = useFilters();
   const [monitorMessage, setMonitorMessage] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const activeFilters = filters.filter(f => f.isActive);
   const unreadMatches = latestMatches.filter(m => !m.isRead);
@@ -26,6 +29,52 @@ export function DashboardPage() {
     }
   }, [monitoringError]);
 
+  const poll = useCallback(async () => {
+    if (!socket) return;
+    try {
+      const query = {
+        operationName: 'GET_ALL_LOTS',
+        query: `query GET_ALL_LOTS($offset: NonNegativeInt, $limit: NonNegativeInt, $sort: LotsSortInput, $filter: LotsFilterInput) {
+          lots(limit: $limit, offset: $offset, sort: $sort, filter: $filter) {
+            Lots {
+              id source type gearScore
+              Prices { value Currency { code title } }
+              Currencies { code title }
+            }
+            Pagination { total }
+          }
+        }`,
+        variables: {
+          filter: {},
+          limit: 50,
+          offset: 0,
+          sort: { field: 'LOT_FIELD_UPDATED_AT', type: 'SORT_TYPE_DESC' },
+        },
+      };
+
+      const response = await queryMuDream(query);
+
+      if (response.data?.lots?.Lots) {
+        const items = response.data.lots.Lots.map((lot: any) => ({
+          id: lot.id,
+          name: lot.source || 'Unknown',
+          type: lot.type || '',
+          gearScore: lot.gearScore || 0,
+          Prices: lot.Prices || [],
+          options: (lot.Currencies || []).map((c: any) => c.code?.toUpperCase() || ''),
+        }));
+
+        socket.emit('monitoring:data', items);
+        setMonitorMessage(`Monitorando... ${items.length} itens`);
+      } else if (response.body?.error) {
+        setMonitorMessage(`Erro MuDream: ${response.body.error}`);
+      }
+    } catch (err) {
+      console.error('[Monitor] Error:', err);
+      setMonitorMessage(`Erro: ${err instanceof Error ? err.message : 'Erro desconhecido'}`);
+    }
+  }, [socket]);
+
   const startMonitoring = () => {
     if (!socket) return;
     if (activeFilters.length === 0) {
@@ -34,15 +83,31 @@ export function DashboardPage() {
     }
     setMonitorMessage('Iniciando monitoramento...');
     socket.emit('monitoring:start', 3000);
-    // Start polling directly from browser (bypasses Cloudflare)
-    (socket as any).__startPolling?.(3000);
+
+    // Start polling immediately
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    poll(); // First poll immediately
+    pollingRef.current = setInterval(poll, 3000);
+    setIsPolling(true);
+    setMonitorMessage('Monitorando...');
   };
 
   const stopMonitoring = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+    setIsPolling(false);
     socket?.emit('monitoring:stop');
-    (socket as any).__stopPolling?.();
     setMonitorMessage('Monitoramento parado');
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">

@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { User, Filter, MarketItem, FilterMatch, MonitoringStatus } from '../shared/types';
-import { queryMuDream } from '../lib/api';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -162,78 +161,6 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     newSocket.on('market:update', (items: MarketItem[]) => {
       setLatestItems(items);
     });
-
-    // Start monitoring loop - query MuDream directly from browser (bypasses Cloudflare)
-    let monitoringInterval: ReturnType<typeof setInterval> | null = null;
-
-    const startPolling = (interval: number = 3000) => {
-      if (monitoringInterval) clearInterval(monitoringInterval);
-
-      const poll = async () => {
-        try {
-          const query = {
-            operationName: 'GET_ALL_LOTS',
-            query: `query GET_ALL_LOTS($offset: NonNegativeInt, $limit: NonNegativeInt, $sort: LotsSortInput, $filter: LotsFilterInput) {
-              lots(limit: $limit, offset: $offset, sort: $sort, filter: $filter) {
-                Lots {
-                  id source type gearScore
-                  Prices { value Currency { code title } }
-                  Currencies { code title }
-                }
-                Pagination { total }
-              }
-            }`,
-            variables: {
-              filter: {},
-              limit: 50,
-              offset: 0,
-              sort: { field: 'LOT_FIELD_UPDATED_AT', type: 'SORT_TYPE_DESC' },
-            },
-          };
-
-          const response = await queryMuDream(query);
-
-          if (response.data?.lots?.Lots) {
-            const items = response.data.lots.Lots.map((lot: any) => ({
-              id: lot.id,
-              name: lot.source || 'Unknown',
-              type: lot.type || '',
-              gearScore: lot.gearScore || 0,
-              Prices: lot.Prices || [],
-              options: (lot.Currencies || []).map((c: any) => c.code?.toUpperCase() || ''),
-            }));
-
-            newSocket.emit('monitoring:data', items);
-          }
-        } catch (err) {
-          console.error('[Monitor] Error:', err);
-          newSocket.emit('monitoring:error', err instanceof Error ? err.message : 'Unknown error');
-        }
-      };
-
-      poll();
-      monitoringInterval = setInterval(poll, interval);
-    };
-
-    const stopPolling = () => {
-      if (monitoringInterval) {
-        clearInterval(monitoringInterval);
-        monitoringInterval = null;
-      }
-    };
-
-    // Also listen for server-side start/stop events
-    newSocket.on('monitoring:start', (interval?: number) => {
-      startPolling(interval || 3000);
-    });
-
-    newSocket.on('monitoring:stop', () => {
-      stopPolling();
-    });
-
-    // Expose start/stop polling via socket for DashboardPage
-    (newSocket as any).__startPolling = startPolling;
-    (newSocket as any).__stopPolling = stopPolling;
 
     setSocket(newSocket);
 

@@ -8,6 +8,7 @@ import fs from 'fs';
 import { config } from './config';
 import { runMigrations } from './database';
 import { setupSocket } from './services/socket';
+import { setSocketServer } from './shared-state';
 import authRoutes from './routes/auth';
 import filterRoutes from './routes/filters';
 import marketRoutes from './routes/market';
@@ -78,6 +79,7 @@ if (fs.existsSync(frontendPath)) {
 }
 
 setupSocket(io);
+setSocketServer(io);
 
 async function start() {
   try {

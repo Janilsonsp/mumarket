@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { supabase } from '../database';
 import { AuthRequest, authMiddleware } from '../auth/middleware';
 import { verifyAccessToken } from '../auth/jwt';
+import { broadcastBookmarkletData } from '../shared-state';
 
 const router = Router();
 
@@ -72,6 +73,9 @@ router.post('/bookmarklet', async (req: AuthRequest, res: Response) => {
         });
       }
     }
+
+    // Broadcast items to connected clients via Socket.IO
+    broadcastBookmarkletData(userId, items);
 
     res.json({ matches: matches.length, itemsReceived: items.length, details: matches });
   } catch (error) {

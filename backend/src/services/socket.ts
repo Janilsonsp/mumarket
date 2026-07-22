@@ -3,7 +3,6 @@ import { Server as HttpServer } from 'http';
 import { verifyAccessToken } from '../auth/jwt';
 import { FilterMatch, MarketItem, MonitoringStatus } from '../shared/types';
 import { supabase } from '../database';
-import { marketMonitor } from './market-monitor';
 
 export function setupSocket(io: SocketServer) {
   const authenticatedSockets = new Map<string, string>();
@@ -89,21 +88,15 @@ export function setupSocket(io: SocketServer) {
     });
 
     socket.on('monitoring:start', (interval?: number) => {
-      marketMonitor.start(interval || 3000);
       io.emit('monitoring:status', { isOnline: true, pollingInterval: interval || 3000 });
     });
 
     socket.on('monitoring:stop', () => {
-      marketMonitor.stop();
       io.emit('monitoring:status', { isOnline: false });
     });
 
     socket.on('monitoring:error', (errorMessage: string) => {
       socket.emit('monitoring:status', { isOnline: true, error: errorMessage });
-    });
-
-    socket.on('filters:changed', () => {
-      marketMonitor.refreshFilters();
     });
 
     socket.on('disconnect', () => {

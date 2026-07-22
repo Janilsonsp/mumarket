@@ -8,7 +8,6 @@ import fs from 'fs';
 import { config } from './config';
 import { runMigrations } from './database';
 import { setupSocket } from './services/socket';
-import { marketMonitor } from './services/market-monitor';
 import authRoutes from './routes/auth';
 import filterRoutes from './routes/filters';
 import marketRoutes from './routes/market';
@@ -79,19 +78,6 @@ if (fs.existsSync(frontendPath)) {
 }
 
 setupSocket(io);
-
-// Wire MarketMonitor events to Socket.IO broadcasting
-marketMonitor.on('market:update', (items: any[]) => {
-  io.emit('market:update', items);
-});
-
-marketMonitor.on('item:match', (matches: any[]) => {
-  io.emit('item:match', matches);
-});
-
-marketMonitor.on('monitoring:error', (errorMessage: string) => {
-  io.emit('monitoring:status', { isOnline: true, error: errorMessage });
-});
 
 async function start() {
   try {

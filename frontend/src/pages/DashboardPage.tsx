@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth, useSocket, useFilters } from '@/contexts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatRelativeTime } from '@/lib/utils';
+import { queryMuDream } from '@/lib/api';
 import { Activity, Filter, Bell, Package, LogOut, Play, Square, AlertTriangle } from 'lucide-react';
 
 export function DashboardPage() {
@@ -11,6 +12,7 @@ export function DashboardPage() {
   const { isConnected, monitoringStatus, monitoringError, latestMatches, latestItems, socket } = useSocket();
   const { filters } = useFilters();
   const [monitorMessage, setMonitorMessage] = useState<string | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const activeFilters = filters.filter(f => f.isActive);
   const unreadMatches = latestMatches.filter(m => !m.isRead);
@@ -26,7 +28,44 @@ export function DashboardPage() {
     }
   }, [monitoringError]);
 
-  const startMonitoring = () => {
+  const poll = useCallback(async () => {
+    if (!socket) return;
+    try {
+      const query = {
+        operationName: 'GET_ALL_LOTS',
+        query: `query GET_ALL_LOTS { lots(limit:50,offset:0,sort:{field:LOT_FIELD_UPDATED_AT,type:SORT_TYPE_DESC}) { Lots { id source type gearScore Prices { value Currency { code title } } Currencies { code title } } Pagination { total } } }`,
+        variables: {},
+      };
+
+      const response = await queryMuDream(query);
+
+      if (response.errors && response.errors.length > 0) {
+        setMonitorMessage(`Erro GraphQL: ${response.errors[0].message}`);
+        return;
+      }
+
+      if (response.data?.lots?.Lots) {
+        const items = response.data.lots.Lots.map((lot: any) => ({
+          id: lot.id,
+          name: lot.source || 'Unknown',
+          type: lot.type || '',
+          gearScore: lot.gearScore || 0,
+          Prices: lot.Prices || [],
+          options: (lot.Currencies || []).map((c: any) => c.code?.toUpperCase() || ''),
+        }));
+
+        socket.emit('monitoring:data', items);
+        setMonitorMessage(`Monitorando... ${items.length} itens`);
+      } else {
+        setMonitorMessage('Sem dados do MuDream');
+      }
+    } catch (err) {
+      console.error('[Monitor] Error:', err);
+      setMonitorMessage(`Erro: ${err instanceof Error ? err.message : 'Erro desconhecido'}`);
+    }
+  }, [socket]);
+
+  const startMonitoring = async () => {
     if (!socket) {
       setMonitorMessage('Socket nao conectado. Recarregue a pagina.');
       return;
@@ -39,14 +78,28 @@ export function DashboardPage() {
       setMonitorMessage('Crie pelo menos um filtro ativo antes de iniciar');
       return;
     }
+    setMonitorMessage('Iniciando monitoramento...');
     socket.emit('monitoring:start', 3000);
-    setMonitorMessage('Aguardando dados do bookmarklet...');
+
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    await poll();
+    pollingRef.current = setInterval(poll, 3000);
   };
 
   const stopMonitoring = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
     socket?.emit('monitoring:stop');
     setMonitorMessage('Monitoramento parado');
   };
+
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">

@@ -8,25 +8,57 @@ export function getSocketUrl(): string {
   return import.meta.env.VITE_API_URL || window.location.origin;
 }
 
-// Direct browser fetch to MuDream - uses real TLS fingerprint + cf_clearance cookie
+// Try multiple approaches to query MuDream API
 export async function queryMuDream(graphQLQuery: GraphQLQuery): Promise<any> {
-  const resp = await fetch('https://mudream.online/api/graphql', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/graphql-response+json',
-    },
-    body: JSON.stringify(graphQLQuery),
-    credentials: 'include',
-  });
+  const body = JSON.stringify(graphQLQuery);
 
-  const text = await resp.text();
+  // Approach 1: Direct fetch (works if CORS headers are present)
+  try {
+    const resp = await fetch('https://mudream.online/api/graphql', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/graphql-response+json',
+      },
+      body: body,
+      credentials: 'include',
+    });
+    if (resp.ok) {
+      const text = await resp.text();
+      return JSON.parse(text);
+    }
+  } catch {}
 
-  if (!resp.ok) {
-    throw new Error(`MuDream HTTP ${resp.status}: ${text.substring(0, 200)}`);
-  }
+  // Approach 2: Via allorigins proxy (adds CORS headers)
+  try {
+    const resp = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent('https://mudream.online/api/graphql'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: body,
+    });
+    if (resp.ok) {
+      const text = await resp.text();
+      return JSON.parse(text);
+    }
+  } catch {}
 
-  return JSON.parse(text);
+  // Approach 3: Via corsproxy.io
+  try {
+    const resp = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://mudream.online/api/graphql'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/graphql-response+json',
+      },
+      body: body,
+    });
+    if (resp.ok) {
+      const text = await resp.text();
+      return JSON.parse(text);
+    }
+  } catch {}
+
+  throw new Error('Todos os proxies bloqueados pelo Cloudflare. Use o Console do DevTools (F12) no mudream.online.');
 }
 
 interface GraphQLQuery {

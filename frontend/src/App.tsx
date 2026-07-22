@@ -104,6 +104,10 @@ function AppContent() {
           {currentPage === 'filters' && <FiltersPage />}
           {currentPage === 'settings' && <SettingsPage />}
           {currentPage === 'admin' && isAdmin && <AdminPage />}
+
+          <footer className="fixed bottom-14 left-1/2 -translate-x-1/2 z-40 text-xs text-muted-foreground/50">
+            v1.1.0
+          </footer>
         </div>
       </FilterProvider>
     </SocketProvider>

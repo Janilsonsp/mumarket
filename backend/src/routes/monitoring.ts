@@ -72,8 +72,8 @@ router.post('/bookmarklet', async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Broadcast items to connected clients via Socket.IO
-    broadcastBookmarkletData(userId, items);
+    // Broadcast items and matches to connected clients via Socket.IO
+    broadcastBookmarkletData(userId, items, matches);
 
     console.log(`[Bookmarklet] User ${userId}: ${items.length} items, ${matches.length} matches`);
     res.json({ matches: matches.length, itemsReceived: items.length, details: matches });

@@ -13,6 +13,11 @@ export function getSocketServer(): SocketServer | null {
 
 // Broadcast bookmarklet data to all connected clients
 export function broadcastBookmarkletData(userId: string, items: any[]) {
-  if (!io) return;
+  if (!io) {
+    console.log('[SharedState] Socket.IO not initialized');
+    return;
+  }
+  console.log(`[SharedState] Broadcasting ${items.length} items to user:${userId}`);
   io.to(`user:${userId}`).emit('market:update', items);
+  io.emit('market:update', items);
 }

@@ -5,6 +5,7 @@ let io: SocketServer | null = null;
 
 export function setSocketServer(socketIO: SocketServer) {
   io = socketIO;
+  console.log('[SharedState] Socket.IO server injected');
 }
 
 export function getSocketServer(): SocketServer | null {

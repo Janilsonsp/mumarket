@@ -10,14 +10,21 @@
     return;
   }
 
+  // Check if we're on mudream.online
+  if (!window.location.hostname.includes('mudream.online')) {
+    alert('ERRO: Abra mudream.online/pt/market primeiro!');
+    return;
+  }
+
   var TOKEN = '__TOKEN__';
   var API = '__API__';
+  var errorCount = 0;
 
   var allItems = [];
   var totalFound = 0;
 
   function queryPage(offset) {
-    return fetch('https://mudream.online/api/graphql', {
+    return fetch('/api/graphql', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -28,9 +35,11 @@
         query: 'query GET_ALL_LOTS($offset: NonNegativeInt, $limit: NonNegativeInt, $sort: LotsSortInput) { lots(limit: $limit, offset: $offset, sort: $sort) { Lots { id source type gearScore Prices { value Currency { code title } } Currencies { code title } } Pagination { total } } }',
         variables: { filter: {}, limit: 200, offset: offset, sort: { field: 'LOT_FIELD_UPDATED_AT', type: 'SORT_TYPE_DESC' } }
       }),
-      credentials: 'include'
+      credentials: 'same-origin'
     }).then(function(r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
+      var contentType = r.headers.get('content-type') || '';
+      if (!contentType.includes('json')) throw new Error('Resposta nao e JSON. Voce esta logado no MuDream?');
       return r.json();
     });
   }
@@ -39,8 +48,8 @@
     allItems = [];
     totalFound = 0;
 
-    // Fetch first page
     queryPage(0).then(function(d) {
+      errorCount = 0;
       if (!d.data || !d.data.lots || !d.data.lots.Lots) throw new Error('Dados invalidos');
 
       var lots = d.data.lots.Lots;
@@ -57,7 +66,6 @@
         });
       });
 
-      // If there are more items, fetch next pages (up to 1000 total)
       var pages = Math.min(Math.ceil(totalFound / 200), 5);
       var promises = [];
       for (var p = 1; p < pages; p++) {
@@ -101,8 +109,11 @@
         }
       }
     }).catch(function(e) {
+      errorCount++;
       console.error('[MuMarket] Erro:', e.message);
-      document.title = '[MuMarket] Erro: ' + e.message;
+      if (errorCount > 3) {
+        document.title = '[MuMarket] ERRO: ' + e.message;
+      }
     });
   }
 
@@ -114,5 +125,5 @@
     Notification.requestPermission();
   }
 
-  alert('Monitor INICIADO! Busca a cada 10s (ate 1000 itens).\nMantenha esta aba aberta.');
+  alert('Monitor INICIADO! Busca a cada 10s.\nMantenha esta aba aberta.');
 })();
